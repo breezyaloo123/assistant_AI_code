@@ -141,8 +141,8 @@ export default function ChatInterface() {
               <div className="bg-primary/10 p-4 rounded-full">
                 <Bot className="h-12 w-12 text-primary" />
               </div>
-              <h2 className="text-xl font-semibold text-foreground">Welcome to StreamAssist</h2>
-              <p className="max-w-md">Start a conversation by typing a message below. Your chat history will be saved in this browser.</p>
+              <h2 className="text-xl font-semibold text-foreground">Bienvenue sur Xaamaal laa say Yéleef</h2>
+              <p className="max-w-md">Commencez une conversation en tapant un message ci-dessous. Votre historique de discussion sera sauvegardé dans ce navigateur.</p>
             </div>
           )}
           {messages.map((message, index) => (
@@ -162,7 +162,7 @@ export default function ChatInterface() {
                 <FormItem className="flex-1">
                   <FormControl>
                     <Input 
-                      placeholder="Ask me anything..." 
+                      placeholder="Posez-moi une question..." 
                       {...field} 
                       disabled={isLoading}
                       className="text-base"
