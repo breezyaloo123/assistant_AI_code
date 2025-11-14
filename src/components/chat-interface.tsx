@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Bot, Send, User, Loader2, Volume2, Mic, MicOff, AlertCircle } from "lucide-react";
+import { Bot, Send, User, Loader2, Volume2, Mic, MicOff, AlertCircle, Paperclip, X } from "lucide-react";
 import { getAiResponse, getAiResponseAudio, transcribeAudio } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 export type Message = {
   role: "user" | "assistant";
   content: string;
   audioUrl?: string | null;
+  fileDataUri?: string | null;
 };
 
 const CHAT_HISTORY_KEY = 'streamassist.chatHistory';
@@ -71,21 +73,32 @@ const ChatMessage = ({ message }: { message: Message }) => {
       )}
       <div
         className={cn(
-          "max-w-[75%] rounded-lg p-3 text-sm shadow-md flex items-center gap-2",
-          isUser
+          "max-w-[75%] rounded-lg p-3 text-sm shadow-md flex flex-col gap-2",
+           isUser
             ? "bg-primary text-primary-foreground"
             : "bg-card text-card-foreground"
         )}
       >
-        <span className="whitespace-pre-wrap">{message.content}</span>
-        {!isUser && message.audioUrl && (
-          <>
-            <Button size="icon" variant="ghost" onClick={handlePlayAudio} className="h-6 w-6 shrink-0">
-              <Volume2 className={cn("h-4 w-4", isPlaying && "text-primary")} />
-            </Button>
-            <audio ref={audioRef} src={message.audioUrl} className="hidden" />
-          </>
+        {message.fileDataUri && (
+           <Image
+              src={message.fileDataUri}
+              alt="Uploaded content"
+              width={300}
+              height={300}
+              className="rounded-md object-cover"
+            />
         )}
+        <div className="flex items-center gap-2">
+            <span className="whitespace-pre-wrap">{message.content}</span>
+            {!isUser && message.audioUrl && (
+            <>
+                <Button size="icon" variant="ghost" onClick={handlePlayAudio} className="h-6 w-6 shrink-0">
+                <Volume2 className={cn("h-4 w-4", isPlaying && "text-primary")} />
+                </Button>
+                <audio ref={audioRef} src={message.audioUrl} className="hidden" />
+            </>
+            )}
+        </div>
       </div>
       {isUser && (
         <Avatar className="h-8 w-8 border">
@@ -114,8 +127,11 @@ export default function ChatInterface() {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -154,6 +170,30 @@ export default function ChatInterface() {
     resolver: zodResolver(formSchema),
     defaultValues: { prompt: "" },
   });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+        setFile(selectedFile);
+        if (selectedFile.type.startsWith("image/")) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFilePreview(reader.result as string);
+            };
+            reader.readAsDataURL(selectedFile);
+        } else {
+             setFilePreview(null);
+        }
+    }
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    setFilePreview(null);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
+  }
 
   const handleStartRecording = async () => {
     if (isRecording) {
@@ -227,10 +267,22 @@ export default function ChatInterface() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
-    const userMessage: Message = { role: "user", content: values.prompt };
+
+    let fileDataUri: string | null = null;
+    if (file) {
+        const reader = new FileReader();
+        fileDataUri = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    const userMessage: Message = { role: "user", content: values.prompt, fileDataUri };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     form.reset();
+    removeFile();
+
 
     try {
       const aiResponseContent = await getAiResponse(newMessages);
@@ -282,6 +334,23 @@ export default function ChatInterface() {
         </div>
       </ScrollArea>
       <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
+        {filePreview && (
+            <div className="relative mb-2 w-24 h-24">
+                <Image src={filePreview} alt="Preview" layout="fill" className="rounded-md object-cover" />
+                <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-slate-600 hover:bg-slate-700" onClick={removeFile}>
+                    <X className="h-4 w-4 text-white" />
+                </Button>
+            </div>
+        )}
+         {file && !filePreview && (
+            <div className="relative mb-2 flex items-center gap-2 rounded-md border p-2">
+                <span className="text-sm">{file.name}</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={removeFile}>
+                    <X className="h-4 w-4" />
+                </Button>
+            </div>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-2">
             <FormField
@@ -301,6 +370,17 @@ export default function ChatInterface() {
                 </FormItem>
               )}
             />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+            <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoadingAnything}
+                aria-label="Attach file"
+            >
+                <Paperclip className="h-5 w-5" />
+            </Button>
             <Button 
               type="button" 
               size="icon" 
@@ -311,7 +391,7 @@ export default function ChatInterface() {
             >
               {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </Button>
-            <Button type="submit" size="icon" disabled={isLoadingAnything} aria-label="Send message">
+            <Button type="submit" size="icon" disabled={isLoadingAnything || (!form.getValues().prompt && !file)} aria-label="Send message">
               {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>

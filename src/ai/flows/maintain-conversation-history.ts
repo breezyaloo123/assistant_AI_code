@@ -11,10 +11,17 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+  fileDataUri: z.string().optional().nullable(),
+});
+
 const MaintainConversationHistoryInputSchema = z.object({
   userPrompt: z.string().describe('The latest user prompt.'),
+  fileDataUri: z.string().optional().nullable().describe("A file, if provided by the user, as a data URI."),
   conversationHistory: z
-    .array(z.object({role: z.enum(['user', 'assistant']), content: z.string()}))
+    .array(MessageSchema)
     .optional()
     .describe('The history of the conversation.'),
 });
@@ -24,8 +31,7 @@ export type MaintainConversationHistoryInput = z.infer<
 
 const MaintainConversationHistoryOutputSchema = z.object({
   response: z.string().describe('The AI generated response.'),
-  updatedConversationHistory:
-    z.array(z.object({role: z.enum(['user', 'assistant']), content: z.string()})),
+  updatedConversationHistory: z.array(MessageSchema),
 });
 export type MaintainConversationHistoryOutput = z.infer<
   typeof MaintainConversationHistoryOutputSchema
@@ -40,11 +46,11 @@ export async function maintainConversationHistory(
 const conversationPrompt = ai.definePrompt({
   name: 'conversationPrompt',
   input: {schema: MaintainConversationHistoryInputSchema},
-  output: {schema: MaintainConversationHistoryOutputSchema},
+  output: {schema: z.object({ response: z.string() }) },
   prompt: `Vous êtes un assistant IA spécialisé dans le droit du travail sénégalais.
 Vous ne devez répondre qu'aux questions relatives au code du travail sénégalais.
 Si une question ne concerne pas le code du travail sénégalais, vous devez refuser de répondre.
-Répondez à la question de l'utilisateur en vous basant sur l'historique de la conversation.
+Répondez à la question de l'utilisateur en vous basant sur l'historique de la conversation et sur le fichier joint s'il y en a un.
 
 Historique de la conversation :
 {{#each conversationHistory}}
@@ -52,6 +58,7 @@ Historique de la conversation :
 {{/each}}
 
 Question de l'utilisateur : {{userPrompt}}
+{{#if fileDataUri}}Fichier joint: {{media url=fileDataUri}}{{/if}}
 
 Assistant :`, // Respond as the assistant
 });
@@ -67,8 +74,8 @@ const maintainConversationHistoryFlow = ai.defineFlow(
 
     const updatedConversationHistory = [
       ...(input.conversationHistory || []),
-      {role: 'user', content: input.userPrompt},
-      {role: 'assistant', content: output!.response},
+      {role: 'user', content: input.userPrompt, fileDataUri: input.fileDataUri},
+      {role: 'assistant', content: output!.response, fileDataUri: null},
     ];
 
     return {

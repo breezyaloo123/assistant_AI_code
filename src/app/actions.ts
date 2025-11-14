@@ -15,6 +15,7 @@ export async function getAiResponse(history: Message[]): Promise<string> {
   try {
     const result = await maintainConversationHistory({
       userPrompt: lastUserMessage.content,
+      fileDataUri: lastUserMessage.fileDataUri,
       conversationHistory: history.slice(0, history.length - 1),
     });
     return result.response;
