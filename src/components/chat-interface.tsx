@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Bot, Send, User, Loader2, Volume2 } from "lucide-react";
-import { getAiResponse, getAiResponseAudio } from "@/app/actions";
+import { Bot, Send, User, Loader2, Volume2, Mic, MicOff, AlertCircle } from "lucide-react";
+import { getAiResponse, getAiResponseAudio, transcribeAudio } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
@@ -111,6 +111,12 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const scrollEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -149,6 +155,76 @@ export default function ChatInterface() {
     defaultValues: { prompt: "" },
   });
 
+  const handleStartRecording = async () => {
+    if (isRecording) {
+      handleStopRecording();
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast({
+        variant: "destructive",
+        title: "Fonctionnalité non prise en charge",
+        description: "Votre navigateur ne prend pas en charge l'enregistrement audio.",
+      });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setHasMicPermission(true);
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+          setIsTranscribing(true);
+          try {
+            const transcribedText = await transcribeAudio(base64Audio);
+            form.setValue("prompt", transcribedText);
+          } catch (error) {
+             toast({
+              variant: "destructive",
+              title: "Erreur de transcription",
+              description: "Impossible de transcrire l'audio. Veuillez réessayer.",
+            });
+          } finally {
+            setIsTranscribing(false);
+          }
+        };
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error getting mic permission:", err);
+      setHasMicPermission(false);
+      toast({
+        variant: "destructive",
+        title: "Accès au microphone refusé",
+        description: "Veuillez autoriser l'accès au microphone dans les paramètres de votre navigateur.",
+      });
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      // Stop all media tracks to turn off the mic indicator
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
     const userMessage: Message = { role: "user", content: values.prompt };
@@ -159,11 +235,9 @@ export default function ChatInterface() {
     try {
       const aiResponseContent = await getAiResponse(newMessages);
       
-      // We set the text response first
       const aiMessage: Message = { role: "assistant", content: aiResponseContent, audioUrl: null };
       setMessages((currentMessages) => [...currentMessages, aiMessage]);
       
-      // Then, we generate and add the audio
       const audioUrl = await getAiResponseAudio(aiResponseContent);
       setMessages((currentMessages) =>
         currentMessages.map((msg) =>
@@ -184,6 +258,8 @@ export default function ChatInterface() {
     }
   };
 
+  const isLoadingAnything = isLoading || isRecording || isTranscribing;
+
   return (
     <div className="flex flex-col h-full w-full">
       <Toaster />
@@ -195,7 +271,7 @@ export default function ChatInterface() {
                 <Bot className="h-12 w-12 text-primary" />
               </div>
               <h2 className="text-xl font-semibold text-foreground">Bienvenue sur Xaamaal laa say Yéleef</h2>
-              <p className="max-w-md">Commencez une conversation en tapant un message ci-dessous. Votre historique de discussion sera sauvegardé dans ce navigateur.</p>
+              <p className="max-w-md">Commencez une conversation en tapant un message ou en utilisant l'icône du microphone. Votre historique de discussion sera sauvegardé dans ce navigateur.</p>
             </div>
           )}
           {messages.map((message, index) => (
@@ -207,7 +283,7 @@ export default function ChatInterface() {
       </ScrollArea>
       <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-2">
             <FormField
               control={form.control}
               name="prompt"
@@ -215,9 +291,9 @@ export default function ChatInterface() {
                 <FormItem className="flex-1">
                   <FormControl>
                     <Input 
-                      placeholder="Posez-moi une question..." 
+                      placeholder={isRecording ? "Enregistrement en cours..." : "Posez-moi une question..."} 
                       {...field} 
-                      disabled={isLoading}
+                      disabled={isLoadingAnything}
                       className="text-base"
                       autoComplete="off"
                     />
@@ -225,11 +301,27 @@ export default function ChatInterface() {
                 </FormItem>
               )}
             />
-            <Button type="submit" size="icon" disabled={isLoading} aria-label="Send message">
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <Button 
+              type="button" 
+              size="icon" 
+              onClick={handleStartRecording} 
+              disabled={isLoading || isTranscribing} 
+              aria-label={isRecording ? "Stop recording" : "Start recording"}
+              variant={isRecording ? "destructive" : "ghost"}
+            >
+              {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </Button>
+            <Button type="submit" size="icon" disabled={isLoadingAnything} aria-label="Send message">
+              {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>
         </Form>
+        {hasMicPermission === false && (
+            <p className="text-xs text-destructive mt-2 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              L'accès au microphone a été bloqué. Veuillez l'activer dans les paramètres de votre navigateur.
+            </p>
+        )}
       </div>
     </div>
   );

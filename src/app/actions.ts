@@ -2,6 +2,7 @@
 
 import { maintainConversationHistory } from '@/ai/flows/maintain-conversation-history';
 import { textToSpeech } from '@/ai/flows/text-to-speech';
+import { speechToText } from '@/ai/flows/speech-to-text';
 import type { Message } from '@/components/chat-interface';
 
 export async function getAiResponse(history: Message[]): Promise<string> {
@@ -31,5 +32,15 @@ export async function getAiResponseAudio(text: string): Promise<string | null> {
     console.error('TTS Error:', error);
     // Return null instead of throwing an error to not break the chat flow
     return null;
+  }
+}
+
+export async function transcribeAudio(audioDataUri: string): Promise<string> {
+  try {
+    const result = await speechToText({ audioDataUri });
+    return result.text;
+  } catch (error) {
+    console.error('Transcription Error:', error);
+    return '';
   }
 }
