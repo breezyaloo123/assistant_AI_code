@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Bot, Send, User, Loader2 } from "lucide-react";
-import { getAiResponse } from "@/app/actions";
+import { Bot, Send, User, Loader2, Volume2 } from "lucide-react";
+import { getAiResponse, getAiResponseAudio } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 export type Message = {
   role: "user" | "assistant";
   content: string;
+  audioUrl?: string | null;
 };
 
 const CHAT_HISTORY_KEY = 'streamassist.chatHistory';
@@ -28,6 +29,39 @@ const formSchema = z.object({
 
 const ChatMessage = ({ message }: { message: Message }) => {
   const isUser = message.role === "user";
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const handlePlayAudio = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      } else {
+        audioRef.current.play();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const audioElement = audioRef.current;
+    if (audioElement) {
+      const onPlay = () => setIsPlaying(true);
+      const onPause = () => setIsPlaying(false);
+      const onEnded = () => setIsPlaying(false);
+
+      audioElement.addEventListener("play", onPlay);
+      audioElement.addEventListener("pause", onPause);
+      audioElement.addEventListener("ended", onEnded);
+
+      return () => {
+        audioElement.removeEventListener("play", onPlay);
+        audioElement.removeEventListener("pause", onPause);
+        audioElement.removeEventListener("ended", onEnded);
+      };
+    }
+  }, []);
+
   return (
     <div className={cn("flex items-start gap-3", isUser ? "justify-end" : "justify-start")}>
       {!isUser && (
@@ -37,13 +71,21 @@ const ChatMessage = ({ message }: { message: Message }) => {
       )}
       <div
         className={cn(
-          "max-w-[75%] rounded-lg p-3 text-sm shadow-md whitespace-pre-wrap",
+          "max-w-[75%] rounded-lg p-3 text-sm shadow-md flex items-center gap-2",
           isUser
             ? "bg-primary text-primary-foreground"
             : "bg-card text-card-foreground"
         )}
       >
-        {message.content}
+        <span className="whitespace-pre-wrap">{message.content}</span>
+        {!isUser && message.audioUrl && (
+          <>
+            <Button size="icon" variant="ghost" onClick={handlePlayAudio} className="h-6 w-6 shrink-0">
+              <Volume2 className={cn("h-4 w-4", isPlaying && "text-primary")} />
+            </Button>
+            <audio ref={audioRef} src={message.audioUrl} className="hidden" />
+          </>
+        )}
       </div>
       {isUser && (
         <Avatar className="h-8 w-8 border">
@@ -116,8 +158,19 @@ export default function ChatInterface() {
 
     try {
       const aiResponseContent = await getAiResponse(newMessages);
-      const aiMessage: Message = { role: "assistant", content: aiResponseContent };
+      
+      // We set the text response first
+      const aiMessage: Message = { role: "assistant", content: aiResponseContent, audioUrl: null };
       setMessages((currentMessages) => [...currentMessages, aiMessage]);
+      
+      // Then, we generate and add the audio
+      const audioUrl = await getAiResponseAudio(aiResponseContent);
+      setMessages((currentMessages) =>
+        currentMessages.map((msg) =>
+          msg === aiMessage ? { ...msg, audioUrl } : msg
+        )
+      );
+
     } catch (error) {
       const typedError = error as Error;
       toast({

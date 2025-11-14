@@ -1,6 +1,7 @@
 'use server';
 
 import { maintainConversationHistory } from '@/ai/flows/maintain-conversation-history';
+import { textToSpeech } from '@/ai/flows/text-to-speech';
 import type { Message } from '@/components/chat-interface';
 
 export async function getAiResponse(history: Message[]): Promise<string> {
@@ -19,5 +20,16 @@ export async function getAiResponse(history: Message[]): Promise<string> {
   } catch (error) {
     console.error('AI Error:', error);
     return 'An error occurred while generating a response. Please try again.';
+  }
+}
+
+export async function getAiResponseAudio(text: string): Promise<string | null> {
+  try {
+    const result = await textToSpeech({ text });
+    return result.audio;
+  } catch (error) {
+    console.error('TTS Error:', error);
+    // Return null instead of throwing an error to not break the chat flow
+    return null;
   }
 }
