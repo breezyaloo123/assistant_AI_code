@@ -152,15 +152,24 @@ export default function ChatInterface() {
     if (isClient) {
       try {
         if (messages.length > 0) {
-          localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+           const messagesToStore = messages.map(({ role, content }) => ({ role, content }));
+           localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messagesToStore));
         } else {
           localStorage.removeItem(CHAT_HISTORY_KEY);
         }
-      } catch (error) {
-        console.error("Failed to save messages to localStorage", error);
+      } catch (error: any) {
+        if (error.name === 'QuotaExceededError') {
+          toast({
+            variant: "destructive",
+            title: "Erreur de stockage",
+            description: "L'historique de la discussion est trop volumineux pour être sauvegardé."
+          });
+        } else {
+          console.error("Failed to save messages to localStorage", error);
+        }
       }
     }
-  }, [messages, isClient]);
+  }, [messages, isClient, toast]);
 
   useEffect(() => {
     scrollEndRef.current?.scrollIntoView({ behavior: "smooth" });
