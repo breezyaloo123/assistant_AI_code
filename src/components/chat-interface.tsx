@@ -331,7 +331,7 @@ export default function ChatInterface() {
               <div className="bg-primary/10 p-4 rounded-full">
                 <Bot className="h-12 w-12 text-primary" />
               </div>
-              <h2 className="text-xl font-semibold text-foreground">Bienvenue sur Xaamaal laa say Yéleef</h2>
+              <h2 className="text-xl font-semibold text-foreground">Man, benn assistant IA laa bu spécialisé ci yoonu liggéeyu Senegaal. Sama liggéey mooy tontu ci laaj yi aju ci code du travail bu Senegaal rekk.</h2>
               <p className="max-w-md">Commencez une conversation en tapant un message ou en utilisant l'icône du microphone. Votre historique de discussion sera sauvegardé dans ce navigateur.</p>
             </div>
           )}
