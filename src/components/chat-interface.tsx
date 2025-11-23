@@ -310,9 +310,10 @@ export default function ChatInterface() {
       const typedError = error as Error;
       toast({
         variant: "destructive",
-        title: "Oh no! Something went wrong.",
-        description: typedError.message || "There was a problem with the AI response.",
+        title: "Une erreur est survenue",
+        description: "Un problème est survenu lors de la génération de la réponse. Veuillez réessayer.",
       });
+      // Remove the user message that caused the error
       setMessages((currentMessages) => currentMessages.filter(msg => msg !== userMessage));
     } finally {
       setIsLoading(false);

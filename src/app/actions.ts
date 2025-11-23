@@ -9,7 +9,7 @@ export async function getAiResponse(history: Message[]): Promise<string> {
   const lastUserMessage = history.length > 0 ? history[history.length - 1] : null;
 
   if (!lastUserMessage || lastUserMessage.role !== 'user') {
-    return "I'm sorry, I couldn't find your last message to respond to.";
+    throw new Error("I'm sorry, I couldn't find your last message to respond to.");
   }
 
   try {
@@ -21,7 +21,8 @@ export async function getAiResponse(history: Message[]): Promise<string> {
     return result.response;
   } catch (error) {
     console.error('AI Error:', error);
-    return 'An error occurred while generating a response. Please try again.';
+    // Re-throw the error to be caught by the client
+    throw new Error('An error occurred while generating a response. Please try again.');
   }
 }
 
