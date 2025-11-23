@@ -1,0 +1,58 @@
+name: Deploy to Vercel via Prefect
+
+# Déclenche ce workflow à chaque fois qu'un push est fait sur la branche 'main'
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-prefect-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Prefect and dependencies
+        run: pip install prefect httpx "pydantic<2"
+
+      - name: Run Prefect Deployment Flow
+        env:
+          # Ces secrets doivent être configurés dans les paramètres de votre repo GitHub
+          PREFECT_API_URL: ${{ secrets.PREFECT_API_URL }}
+          PREFECT_API_KEY: ${{ secrets.PREFECT_API_KEY }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          python -c "
+          from prefect import flow, task
+          from prefect.deployments import run_deployment
+          import httpx
+          import os
+
+          @task
+          def trigger_vercel_deploy(hook_url: str):
+              print('Triggering Vercel deployment...')
+              try:
+                  with httpx.Client() as client:
+                      response = client.post(hook_url)
+                      response.raise_for_status()
+                      print('Vercel deployment triggered successfully!')
+                      print(f'Vercel response: {response.json()}')
+              except httpx.HTTPStatusError as e:
+                  print(f'Error triggering Vercel deployment: {e.response.text}')
+                  raise
+
+          @flow(name='Vercel Trigger Flow from GH Action')
+          def vercel_trigger_flow():
+              hook_url = os.getenv('VERCEL_DEPLOY_HOOK_URL')
+              if not hook_url:
+                  raise ValueError('VERCEL_DEPLOY_HOOK_URL secret is not set.')
+              trigger_vercel_deploy(hook_url)
+
+          vercel_trigger_flow()
+          "
