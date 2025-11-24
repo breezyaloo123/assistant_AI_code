@@ -302,9 +302,8 @@ export default function ChatInterface() {
       const aiMessage: Message = { id: aiMessageId, role: "assistant", content: aiResponseContent, audioUrl: null };
       
       setMessages((currentMessages) => [...currentMessages, aiMessage]);
-      setIsLoading(false); // Stop loading right after text response is displayed
+      setIsLoading(false);
       
-      // Fetch audio in the background without a global loading state
       getAiResponseAudio(aiResponseContent).then(audioUrl => {
         setMessages((currentMessages) =>
           currentMessages.map((msg) =>
@@ -420,3 +419,4 @@ export default function ChatInterface() {
       </div>
     </div>
   );
+}
