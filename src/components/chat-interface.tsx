@@ -332,7 +332,7 @@ export default function ChatInterface() {
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-6">
           {isClient && messages.length === 0 && !isLoading && (
-            <div className="text-center text-muted-foreground pt-16 flex flex-col items-center gap-4">
+            <div key="welcome-message" className="text-center text-muted-foreground pt-16 flex flex-col items-center gap-4">
               <div className="bg-primary/10 p-4 rounded-full">
                 <Bot className="h-12 w-12 text-primary" />
               </div>
