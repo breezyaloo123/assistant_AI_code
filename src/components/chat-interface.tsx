@@ -344,7 +344,7 @@ export default function ChatInterface() {
           {messages.map((message) => (
             <ChatMessage key={message.id} message={message} />
           ))}
-          {isLoading && <LoadingChatMessage />}
+          {isLoading && <LoadingChatMessage key="loading" />}
           <div ref={scrollEndRef} />
         </div>
       </ScrollArea>
@@ -420,4 +420,3 @@ export default function ChatInterface() {
       </div>
     </div>
   );
-}
