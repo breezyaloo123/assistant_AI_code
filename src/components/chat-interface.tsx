@@ -344,7 +344,7 @@ export default function ChatInterface() {
             <ChatMessage key={message.id} message={message} />
           ))}
           {isLoading && <LoadingChatMessage key="loading" />}
-          <div ref={scrollEndRef} />
+          <div key="scroll-end" ref={scrollEndRef} />
         </div>
       </ScrollArea>
       <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
