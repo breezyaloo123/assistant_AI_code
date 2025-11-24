@@ -8,7 +8,7 @@
  * - MaintainConversationHistoryOutput - The return type for the maintainConversationHistory function.
  */
 
-import {ai}from '@/ai/genkit';
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const MessageSchema = z.object({
@@ -60,7 +60,7 @@ Conversation history:
   {{#if this.fileDataUri}}Attached file: {{media url=this.fileDataUri}}{{/if}}
 {{/each}}
 
-User's question: {{userPrompt}}
+User's question: {{{userPrompt}}}
 {{#if fileDataUri}}Attached file: {{media url=fileDataUri}}{{/if}}
 
 Assistant:`, // Respond as the assistant

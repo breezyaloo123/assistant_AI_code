@@ -1,5 +1,3 @@
-// This file is machine-generated - edit with care!
-
 'use server';
 
 /**
@@ -38,7 +36,7 @@ If a question does not relate to either the Senegalese labor code or collective 
 
 Please answer the following question:
 
-{{prompt}}`,
+{{{prompt}}}`,
 });
 
 const generateResponseFlow = ai.defineFlow(
