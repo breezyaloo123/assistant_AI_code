@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 
 export type Message = {
+  id: string;
   role: "user" | "assistant";
   content: string;
   audioUrl?: string | null;
@@ -33,6 +34,7 @@ const ChatMessage = ({ message }: { message: Message }) => {
   const isUser = message.role === "user";
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isFetchingAudio, setIsFetchingAudio] = useState(!isUser && !message.audioUrl);
 
   const handlePlayAudio = () => {
     if (audioRef.current) {
@@ -44,6 +46,14 @@ const ChatMessage = ({ message }: { message: Message }) => {
       }
     }
   };
+
+  useEffect(() => {
+    // If the audioUrl is populated after initial render, stop the fetch indicator
+    if (message.audioUrl) {
+      setIsFetchingAudio(false);
+    }
+  }, [message.audioUrl]);
+
 
   useEffect(() => {
     const audioElement = audioRef.current;
@@ -90,6 +100,7 @@ const ChatMessage = ({ message }: { message: Message }) => {
         )}
         <div className="flex items-center gap-2">
             <span className="whitespace-pre-wrap">{message.content}</span>
+            {!isUser && isFetchingAudio && <Loader2 className="h-4 w-4 animate-spin" />}
             {!isUser && message.audioUrl && (
             <>
                 <Button size="icon" variant="ghost" onClick={handlePlayAudio} className="h-6 w-6 shrink-0">
@@ -152,7 +163,8 @@ export default function ChatInterface() {
     if (isClient) {
       try {
         if (messages.length > 0) {
-           const messagesToStore = messages.map(({ role, content }) => ({ role, content }));
+           // We only store text content to avoid storage issues with audio/file data URIs
+           const messagesToStore = messages.map(({ id, role, content }) => ({ id, role, content }));
            localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messagesToStore));
         } else {
           localStorage.removeItem(CHAT_HISTORY_KEY);
@@ -273,49 +285,52 @@ export default function ChatInterface() {
     }
   };
 
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
 
     let fileDataUri: string | null = null;
     if (file) {
-        const reader = new FileReader();
         fileDataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
             reader.readAsDataURL(file);
         });
     }
 
-    const userMessage: Message = { role: "user", content: values.prompt, fileDataUri };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    const userMessage: Message = { id: crypto.randomUUID(), role: "user", content: values.prompt, fileDataUri };
+    // We pass the full history to getAiResponse, including the new user message
+    const currentHistory = [...messages, userMessage];
+    setMessages(currentHistory);
     form.reset();
     removeFile();
 
 
     try {
-      const aiResponseContent = await getAiResponse(newMessages);
+      const aiResponseContent = await getAiResponse(currentHistory);
       
-      const aiMessage: Message = { role: "assistant", content: aiResponseContent, audioUrl: null };
+      const aiMessageId = crypto.randomUUID();
+      const aiMessage: Message = { id: aiMessageId, role: "assistant", content: aiResponseContent, audioUrl: null };
+      
       setMessages((currentMessages) => [...currentMessages, aiMessage]);
+      setIsLoading(false); // Stop loading right after text response is displayed
       
-      const audioUrl = await getAiResponseAudio(aiResponseContent);
-      setMessages((currentMessages) =>
-        currentMessages.map((msg) =>
-          msg === aiMessage ? { ...msg, audioUrl } : msg
-        )
-      );
+      // Fetch audio in the background without a global loading state
+      getAiResponseAudio(aiResponseContent).then(audioUrl => {
+        setMessages((currentMessages) =>
+          currentMessages.map((msg) =>
+            msg.id === aiMessageId ? { ...msg, audioUrl } : msg
+          )
+        );
+      });
 
     } catch (error) {
-      const typedError = error as Error;
       toast({
         variant: "destructive",
         title: "Une erreur est survenue",
         description: "Un problème est survenu lors de la génération de la réponse. Veuillez réessayer.",
       });
-      // Remove the user message that caused the error
-      setMessages((currentMessages) => currentMessages.filter(msg => msg !== userMessage));
-    } finally {
+      // Remove the user message that caused the error to allow resubmission
+      setMessages((currentMessages) => currentMessages.filter(msg => msg.id !== userMessage.id));
       setIsLoading(false);
     }
   };
@@ -336,8 +351,8 @@ export default function ChatInterface() {
               <p className="max-w-md">Commencez une conversation en tapant un message ou en utilisant l'icône du microphone. Votre historique de discussion sera sauvegardé dans ce navigateur.</p>
             </div>
           )}
-          {messages.map((message, index) => (
-            <ChatMessage key={index} message={message} />
+          {messages.map((message) => (
+            <ChatMessage key={message.id} message={message} />
           ))}
           {isLoading && <LoadingChatMessage />}
           <div ref={scrollEndRef} />
