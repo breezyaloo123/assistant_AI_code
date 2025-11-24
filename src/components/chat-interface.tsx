@@ -34,7 +34,6 @@ const ChatMessage = ({ message }: { message: Message }) => {
   const isUser = message.role === "user";
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isFetchingAudio, setIsFetchingAudio] = useState(!isUser && !message.audioUrl);
 
   const handlePlayAudio = () => {
     if (audioRef.current) {
@@ -46,14 +45,6 @@ const ChatMessage = ({ message }: { message: Message }) => {
       }
     }
   };
-
-  useEffect(() => {
-    // If the audioUrl is populated after initial render, stop the fetch indicator
-    if (message.audioUrl) {
-      setIsFetchingAudio(false);
-    }
-  }, [message.audioUrl]);
-
 
   useEffect(() => {
     const audioElement = audioRef.current;
@@ -100,7 +91,6 @@ const ChatMessage = ({ message }: { message: Message }) => {
         )}
         <div className="flex items-center gap-2">
             <span className="whitespace-pre-wrap">{message.content}</span>
-            {!isUser && isFetchingAudio && <Loader2 className="h-4 w-4 animate-spin" />}
             {!isUser && message.audioUrl && (
             <>
                 <Button size="icon" variant="ghost" onClick={handlePlayAudio} className="h-6 w-6 shrink-0">
