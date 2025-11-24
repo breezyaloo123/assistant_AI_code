@@ -16,6 +16,7 @@ const MessageSchema = z.object({
   content: z.string(),
   fileDataUri: z.string().optional().nullable(),
 });
+export type Message = z.infer<typeof MessageSchema>;
 
 const MaintainConversationHistoryInputSchema = z.object({
   userPrompt: z.string().describe('The latest user prompt.'),
@@ -71,17 +72,33 @@ const maintainConversationHistoryFlow = ai.defineFlow(
     inputSchema: MaintainConversationHistoryInputSchema,
     outputSchema: MaintainConversationHistoryOutputSchema,
   },
-  async input => {
+  async (input): Promise<MaintainConversationHistoryOutput> => {
     const {output} = await conversationPrompt(input);
+    
+    if (!output) {
+      throw new Error('AI failed to generate a response.');
+    }
+
+    const userMessage: Message = {
+        role: 'user',
+        content: input.userPrompt,
+        fileDataUri: input.fileDataUri
+    };
+
+    const assistantMessage: Message = {
+        role: 'assistant',
+        content: output.response,
+        fileDataUri: null
+    };
 
     const updatedConversationHistory = [
       ...(input.conversationHistory || []),
-      {role: 'user', content: input.userPrompt, fileDataUri: input.fileDataUri},
-      {role: 'assistant', content: output!.response, fileDataUri: null},
+      userMessage,
+      assistantMessage,
     ];
 
     return {
-      response: output!.response,
+      response: output.response,
       updatedConversationHistory: updatedConversationHistory,
     };
   }
