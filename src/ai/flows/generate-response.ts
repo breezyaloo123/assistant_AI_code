@@ -32,7 +32,7 @@ const generateResponsePrompt = ai.definePrompt({
   input: {schema: GenerateResponseInputSchema},
   output: {schema: GenerateResponseOutputSchema},
   prompt: `You are an AI assistant specializing in Senegalese labor law.
-You must answer in the same language as the user's question (French or English).
+You must answer in the same language as the user's question (French or English or Wolof).
 You must only answer questions relating to the Senegalese labor code and existing collective agreements in Senegal.
 If a question does not relate to either the Senegalese labor code or collective agreements, you must decline to answer.
 

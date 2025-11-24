@@ -48,7 +48,7 @@ const conversationPrompt = ai.definePrompt({
   input: {schema: MaintainConversationHistoryInputSchema},
   output: {schema: z.object({ response: z.string() }) },
   prompt: `You are an AI assistant specializing in Senegalese labor law.
-You must answer in the same language as the user's question (French or English).
+You must answer in the same language as the user's question (French or English or Wolof).
 You must only answer questions relating to the Senegalese labor code and existing collective agreements in Senegal.
 If a question does not relate to either the Senegalese labor code or collective agreements, you must decline to answer.
 Answer the user's question based on the conversation history and any attached file.
@@ -56,6 +56,7 @@ Answer the user's question based on the conversation history and any attached fi
 Conversation history:
 {{#each conversationHistory}}
   {{this.role}}: {{this.content}}
+  {{#if this.fileDataUri}}Attached file: {{media url=this.fileDataUri}}{{/if}}
 {{/each}}
 
 User's question: {{userPrompt}}
